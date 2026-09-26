@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Who visited your site{% endblock %}
+{% block body %}
+<div class="panel">
+  <span class="stat"><b>{{ total }}</b>visits</span>
+  <span class="stat"><b>{{ identified }}</b>matched to a company</span>
+</div>
+
+<details class="help">
+  <summary>Set this up on malveon.com</summary>
+  <div class="body">
+    Paste this line just before <code>&lt;/body&gt;</code> on your site:
+    <pre style="background:#0d1117;border:1px solid var(--line);border-radius:6px;padding:10px;overflow-x:auto;margin:8px 0"><code>&lt;script async src="{{ host }}/px.js"&gt;&lt;/script&gt;</code></pre>
+    It waits 4 seconds before recording anything, so bots that bounce straight
+    off don't count as visitors.
+    <br><br>
+    <b>Most visits won't match a company, and that's normal.</b> People browsing
+    from home or on their phone can't be traced back to an employer by anyone.
+    Office networks usually can. Expect a small share to resolve, and treat
+    those as the useful ones.
+  </div>
+</details>
+
+<table>
+<tr><th style="width:150px">When</th><th style="width:200px">Company</th><th>Page they read</th>
+    <th style="width:110px">Time on page</th></tr>
+{% for v in rows %}
+<tr>
+  <td class="muted">{{ v.created_at[:16].replace('T',' ') }}</td>
+  <td>{% if v.domain %}<a href="/a/{{ v.domain }}"><b>{{ v.domain }}</b></a>
+      {% elif v.resolution == 'bot' %}<span class="muted" title="Automated crawler, not a person">Bot</span>
+      {% else %}<span class="muted" title="{{ (v.org or 'Home or mobile network')[:60] }}">Couldn't tell</span>{% endif %}</td>
+  <td>{{ v.path }}{% if v.referrer %}<div class="muted">came from {{ v.referrer[:70] }}</div>{% endif %}</td>
+  <td class="muted">{% if v.seconds %}{{ v.seconds|int }}s{% else %}—{% endif %}</td>
+</tr>
+{% else %}
+<tr><td colspan="4" class="muted" style="padding:40px;text-align:center">
+  No visits recorded yet. Add the snippet above to malveon.com.</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

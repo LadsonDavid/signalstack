@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block toolbar %}
+<div class="chips">
+  <a class="chip {{ 'on' if not type and not watch }}" href="/">Everyone</a>
+  <a class="chip {{ 'on' if type=='company' }}" href="/?type=company"
+     title="{{ lead_type('company')[2] }}">Something happened</a>
+  <a class="chip {{ 'on' if type=='intent' }}" href="/?type=intent"
+     title="{{ lead_type('intent')[2] }}">Actively looking</a>
+  <a class="chip {{ 'on' if type=='cold' }}" href="/?type=cold"
+     title="{{ lead_type('cold')[2] }}">Good fit, quiet</a>
+  <a class="chip {{ 'on' if watch }}" href="/?watch=1">★ Starred</a>
+  <form action="/" method="get" class="inline" style="margin-left:auto">
+    <input name="q" value="{{ q }}" placeholder="search companies…" style="width:180px">
+  </form>
+</div>
+{% endblock %}
+{% block body %}
+<div class="panel">
+  <span class="stat"><b>{{ stats.accounts }}</b>companies tracked</span>
+  <span class="stat"><b>{{ stats.contacts }}</b>emails found</span>
+  <span class="stat"><b>{{ stats.watchlist }}</b>starred</span>
+  <span class="stat"><b>{{ stats.disqualified }}</b>ruled out</span>
+</div>
+
+<details class="help">
+  <summary>How this list works</summary>
+  <div class="body">
+    Every company here is sorted by how worth contacting they are today.
+    The number on the left combines two things: how well they <b>match</b> the
+    kind of company that buys Malveon, and whether something is <b>happening
+    right now</b> that gives you a reason to get in touch.
+    A company can be a perfect match and still sit near the bottom if nothing
+    is going on with them this week.
+  </div>
+</details>
+
+<table>
+<tr class="sticky-th">
+  {% if type == 'cold' %}
+  <th style="width:64px"><abbr title="{{ FIT_HELP }}">Match</abbr></th>
+  {% else %}
+  <th style="width:64px"><abbr title="{{ SCORE_HELP }}">Score</abbr></th>
+  {% endif %}
+  <th style="width:230px">Company</th>
+  <th style="width:120px">Match / Activity</th>
+  <th>Why they're here</th>
+  <th style="width:230px">Who to email</th>
+</tr>
+{% for r in rows %}
+<tr>
+  {% if type == 'cold' %}
+  {# Good fit, quiet is sorted by fit, not score — every row here scores 0
+     by definition (no live intent), so leading with "0" reads as broken
+     rather than as "nothing urgent right now." #}
+  <td class="score {{ r.tier }}">{{ r.fit }}</td>
+  {% else %}
+  <td class="score {{ r.tier }}">{{ r.score }}</td>
+  {% endif %}
+  <td>
+    <a href="/a/{{ r.domain }}"><b>{{ r.name or r.domain }}</b></a>
+    {% if r.watchlisted %}<span title="Starred">★</span>{% endif %}
+    <div class="muted">{{ r.domain }}{% if r.headcount %} · {{ r.headcount }} people{% endif %}
+      {% if r.eng_open_reqs %} · {{ r.eng_open_reqs }} open eng roles{% endif %}</div>
+  </td>
+  <td class="bars">
+    <abbr title="{{ FIT_HELP }}">match</abbr> {{ r.fit }}<br>
+    <abbr title="{{ INTENT_HELP }}">activity</abbr> {{ r.intent }}
+  </td>
+  <td class="why">
+    {% if r.trigger %}<div><b class="warm">⚡ {{ r.trigger }}</b></div>{% endif %}
+    {{ r.why }}
+  </td>
+  <td>
+    {% for c in r.contacts[:2] %}
+      {% set label, cls, why = email_status(c.status) %}
+      <div style="margin-bottom:6px">
+        <a href="mailto:{{ c.email }}?subject={{ 'Quick question about ' ~ (r.name or r.domain) }}">{{ c.email }}</a>
+        <span class="pill {{ cls }}" title="{{ why }}">{{ label }}</span>
+        {% if c.name %}<div class="muted">{{ c.name }}{% if c.title %} · {{ c.title[:34] }}{% endif %}</div>{% endif %}
+      </div>
+    {% else %}
+      <form action="/a/{{ r.domain }}/enrich" method="post" class="inline">
+        <button title="Looks for work email addresses this company has published publicly">Find emails</button>
+      </form>
+    {% endfor %}
+    {% if r.contacts|length > 2 %}<div class="muted">+{{ r.contacts|length - 2 }} more</div>{% endif %}
+    <div style="margin-top:4px">
+      {% for t in r.types %}{% set tl, tc, th = lead_type(t) %}
+        <span class="tag {{ tc }}" title="{{ th }}">{{ tl }}</span>
+      {% endfor %}
+    </div>
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="muted" style="padding:40px;text-align:center">
+  No companies match this filter yet.
+  {% if type or watch or q %}<br><a href="/">Show everyone</a>{% endif %}
+</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

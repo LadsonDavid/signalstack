@@ -1,0 +1,19 @@
+# Secrets — the glob matters: plain ".env" does NOT cover .env.bak/.env.local,
+# and a single leaked backup file exposes every provider key at once.
+.env
+.env.*
+!.env.example
+
+# Collected data. Contains real contact emails harvested from public sources,
+# so it stays local regardless of size.
+data/
+*.db
+*.db-wal
+*.db-shm
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.DS_Store

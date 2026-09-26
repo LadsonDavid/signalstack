@@ -1,0 +1,546 @@
+# Malveon buying-signal config — the control surface.
+# Weights, keywords, fingerprints and persona pain language live here so
+# retuning never requires a code change. Scores are recomputed from the
+# immutable signal log on every read, so editing this file re-scores all of
+# history instantly. Reload without restart from /ops.
+
+product:
+  name: Malveon
+  domain: malveon.com
+  pitch: "Context layer for engineering teams — plan vs built, correlated incidents, decisions with evidence"
+
+# ---------------------------------------------------------------- PRODUCT LINES
+# Detected tools are grouped by which Malveon product they justify pitching.
+# This is what turns "9 integrations detected" into an actual opening line.
+product_lines:
+  malve:     {label: "Malve — Context",              hook: "decisions buried in Slack/Notion threads"}
+  malvedeck: {label: "Malvedeck — Planning & Health", hook: "plan vs what actually shipped"}
+  malviont:  {label: "Malviont — Execution & Safety", hook: "incident triage and deploy safety"}
+
+# ---------------------------------------------------------------- FIT
+fit:
+  # Integrations are WEIGHTED, not counted. Every software company runs
+  # AWS + GitHub, so counting them flattens every account to fit=100 and the
+  # score stops discriminating. Planning tools (Jira/Linear) and production
+  # ownership tools (PagerDuty/Sentry/Datadog) are the real predictors.
+  integration_detected:
+    each: 6
+    cap: 60
+    weights:
+      # -- Malvedeck: strongest predictors, this is the plan-vs-built product
+      Jira: 12
+      Linear: 12
+      # -- Malviont: production ownership
+      PagerDuty: 12
+      Sentry: 10
+      Datadog: 10
+      Vercel: 5
+      Netlify: 5
+      Render: 5
+      Railway: 5
+      Heroku: 5
+      "Fly.io": 5
+      GitHub: 3
+      AWS: 2
+      Azure: 2
+      "Google Cloud": 2
+      # -- Malve: context sprawl
+      Slack: 10
+      "Microsoft Teams": 10
+      Notion: 9
+      Confluence: 9
+      "Google Docs": 6
+
+  # Two or more product lines represented = tool sprawl across categories,
+  # which is the exact condition Malveon exists for. Worth more than raw count.
+  multi_line_bonus: {two_lines: 8, three_lines: 18}
+
+  status_page: 20
+  owns_production_language: 15
+  persona_pain_match: 12          # their own job ads describe a persona's pain
+  competitor_complementary: 15
+  competitor_displacement: 20
+  # 8-60 engineers, not 8-250: named competitors explicitly target above this
+  # (Cortex "50+ engineers," their CEO puts real pain at "80 to 100") — staying
+  # under that is the defensible mid-market gap. Treat as a hypothesis to
+  # correct from real conversations, not a settled fact.
+  headcount_band: {min: 8, max: 60, points: 15}
+
+  disqualify:
+    keywords: [" agency", "consultancy", "consulting", "staffing", "recruitment agency", "outsourcing"]
+    # Matches headcount_band above exactly — a company confirmed outside 8-60
+    # shouldn't just score lower, it shouldn't be on any list page at all.
+    headcount_over: 60
+    headcount_under: 8
+
+  never_target:
+    - malveon.com
+    - incident.io
+    - rootly.com
+    - firehydrant.com
+    - opslevel.com
+    - cortex.io
+    - blameless.com
+    - jeli.io
+    - getport.io
+    - backstage.io
+    - linearb.io
+    - getdx.com
+    - jellyfish.co
+    - swarmia.com
+    - harness.io
+
+# ---------------------------------------------------------------- INTENT
+# Decayed at READ time: weight * 0.5 ** (age_days / half_life_days)
+intent:
+  # Someone reading malveon.com is worth more than anything inferred from
+  # outside. Pricing page especially — that is a buying motion, not research.
+  site_visit_pricing:       {weight: 55, half_life_days: 5}
+  site_visit:               {weight: 30, half_life_days: 7}
+  # A major outage in the last month means the Tech Lead villain is happening
+  # to them NOW. Everything else here measures fit; this measures timing.
+  major_incident:           {weight: 45, half_life_days: 10}
+  incident_streak:          {weight: 35, half_life_days: 14}
+  recent_incident:          {weight: 22, half_life_days: 7,  max: 44}
+  # Starring Backstage/Rootly/OpsLevel is the cheapest possible act of
+  # evaluation — they are shopping the category right now.
+  competitor_evaluation:    {weight: 40, half_life_days: 21, max: 80}
+  stated_intent:            {weight: 45, half_life_days: 7}
+  competitor_gripe:         {weight: 30, half_life_days: 14}
+  persona_pain_post:        {weight: 35, half_life_days: 10}
+  first_sre_hire:           {weight: 25, half_life_days: 45}
+  funding_seed_a:           {weight: 22, half_life_days: 45}
+  first_em_hire:            {weight: 20, half_life_days: 45}
+  first_release_hire:       {weight: 20, half_life_days: 45}
+  first_security_hire:      {weight: 20, half_life_days: 45}
+  new_status_page:          {weight: 18, half_life_days: 30}
+  eng_req_surge:            {weight: 15, half_life_days: 30}
+  active_research:          {weight: 12, half_life_days: 21, max: 24}
+  # Posting in a monthly "Who is hiring" thread. Weak on purpose — almost
+  # everyone in that thread is hiring, so it is context, not a trigger.
+  # `max` caps the total this kind can ever contribute no matter how many times
+  # it fires, so four months of job ads cannot outrank one real trigger.
+  hiring_publicly:          {weight: 8,  half_life_days: 30, max: 16}
+
+# Which lead type each intent kind feeds. Declared here, not hardcoded, so
+# adding a new signal kind forces you to classify it — an unclassified kind
+# scores normally but belongs to no lead type, so it silently vanishes from
+# every filter chip on the board. A test enforces that this stays exhaustive.
+lead_types:
+  # A dated company event you can open with: "saw you just...".
+  company_triggers: [first_sre_hire, first_em_hire, first_release_hire, first_security_hire,
+                     funding_seed_a, eng_req_surge, new_status_page, major_incident, incident_streak]
+  # Something they said, did, or researched that shows they are in market.
+  intent_signals: [stated_intent, competitor_gripe, persona_pain_post,
+                   competitor_evaluation, site_visit, site_visit_pricing,
+                   recent_incident, active_research]
+  # Scores, but drives no lead type. `hiring_publicly` fired on 481 of 895
+  # accounts — as a trigger it made more than half the universe a "Company
+  # Lead" and the filter meaningless. It is background context, not an event.
+  context_only: [hiring_publicly, contacts_found]
+
+# Not a signal kind (so it is exempt from the lead_types exhaustiveness check
+# above) — a scoring-time bonus computed from which product LINES the intent
+# signals already found actually belong to. No tracked competitor covers all
+# three; a company in pain across two or more at once is the account only
+# Malveon fits, worth more than each signal scored alone.
+multi_layer_pain_bonus: {two_lines: 15, three_lines: 30}
+
+thresholds:
+  sql: 60
+  mql: 35
+  trigger_window_days: 60
+  # score = (fit_floor + (1 - fit_floor) * fit/100) * intent
+  # Fit gates but must not annihilate: an account discovered from a hot post
+  # before the fingerprint collector ran has fit 0 through no fault of its own.
+  fit_floor: 0.35
+
+# ---------------------------------------------------------------- PERSONAS
+# Six buyers, each with the language they actually use when in pain. These
+# drive BOTH intent mining (what to search for) and outreach (what to say).
+#
+# HONESTY FLAG: these pains are founder-stated, not customer-validated. Mom Test
+# rule — a pain you assumed is a hypothesis, not evidence. `pain_terms` are
+# therefore also a research instrument: when a post matches, that is a real
+# person describing the pain in the wild, which is the closest thing to
+# validation you can get without an interview. Watch which personas actually
+# fire. The ones that never do are the ones to question.
+personas:
+  ceo:
+    title: "CEO / Founder"
+    villain: "Finding out a project is in trouble the day before the board meeting"
+    line: malvedeck
+    titles: ["ceo", "founder", "co-founder", "cofounder", "chief executive"]
+    pain_terms:
+      ["plan vs built", "plan vs reality", "roadmap vs reality", "what actually shipped",
+       "status report is wrong", "phantom feature", "claimed but not shipped",
+       "board meeting surprise", "found out too late", "thought it was done",
+       "engineering visibility", "no idea what engineering is doing"]
+    one_liner: "Know before the board meeting, not during it."
+
+  em:
+    title: "Engineering Manager"
+    villain: "A blocker sitting silent for three days"
+    line: malvedeck
+    titles: ["engineering manager", "director of engineering", "vp of engineering",
+             "vp engineering", "head of engineering", "engineering lead"]
+    # "capacity planning", "escalation path" and "team health" were dropped —
+    # standard EM/SRE job-posting vocabulary that fired on almost every
+    # company regardless of whether this specific pain was real, discovered
+    # by actually reading the output: everyone from Linear to PlanetScale to
+    # Neon showed up with the same handful of generic phrases.
+    pain_terms:
+      ["silent blocker", "blocked for days", "who is overloaded", "team burnout",
+       "burnt out", "workload visibility", "nobody flagged it",
+       "found out after burnout", "sprint slipping"]
+    one_liner: "The alarm rings on day one, not after burnout."
+
+  techlead:
+    title: "Tech Lead"
+    villain: "45 minutes of tab-switching to find one root cause"
+    line: malviont
+    titles: ["tech lead", "technical lead", "staff engineer", "principal engineer",
+             "lead engineer", "architect"]
+    # "root cause" (root cause analysis is standard SRE-job boilerplate),
+    # "correlate logs" and "what changed" were dropped for the same reason as
+    # the EM list — too common to mean anything on their own. The rest stay
+    # because they're specific enough that a normal job post wouldn't use
+    # them by accident.
+    pain_terms:
+      ["six tabs", "too many tabs", "45 minutes", "incident timeline",
+       "manual correlation", "git blame archaeology", "who deployed this",
+       "missing env var", "unreviewed migration", "broke prod",
+       "evidence chain", "postmortem timeline"]
+    one_liner: "45 minutes of detective work becomes a 60-second timeline."
+
+  developer:
+    title: "Developer"
+    villain: "Learning you leaked a secret in the postmortem instead of the editor"
+    line: malviont
+    titles: ["software engineer", "developer", "backend engineer", "frontend engineer",
+             "full stack", "fullstack"]
+    pain_terms:
+      ["committed a secret", "leaked api key", "secret in git history", "rotate credentials",
+       "pre-commit hook", "context switching", "constant context switch",
+       "is this actually built", "had to ask the lead", "ide to slack to jira"]
+    one_liner: "Catch it before the commit, not in the postmortem."
+
+  pm:
+    title: "Project Manager"
+    villain: "Re-litigating a decision nobody wrote down three months ago"
+    line: malve
+    titles: ["project manager", "product manager", "program manager", "delivery manager",
+             "scrum master", "technical program manager"]
+    # "decision log", "decision record", "adr" and "architecture decision" were
+    # dropped: ADRs are a well-known GOOD practice, so a job post mentioning
+    # one is usually bragging they already do this well — the opposite of the
+    # pain. "standup status" was too generic on its own too.
+    pain_terms:
+      ["why did we decide", "re-litigate", "relitigate", "buried in slack",
+       "lost in a thread", "search slack history", "manual status update",
+       "chase people for updates"]
+    one_liner: "Nobody asks 'why did we decide this' — the evidence is already there."
+
+  devops:
+    title: "DevOps / QA"
+    villain: "Nine dashboards and no idea which to open first"
+    line: malviont
+    titles: ["devops", "sre", "site reliability", "platform engineer", "infrastructure engineer",
+             "qa engineer", "release engineer", "production engineer"]
+    pain_terms:
+      ["nine dashboards", "too many dashboards", "which dashboard first", "on-call runbook",
+       "multi cloud secrets", "env var per environment", "secrets across clouds",
+       "ci across providers", "deploy checklist", "one feed", "single pane of glass"]
+    one_liner: "Seven dashboards become one feed."
+
+# ---------------------------------------------------------------- FINGERPRINTS
+# Malveon's 18 integrations. `web` = detectable by HTTP/DNS on their own site.
+# `jd` = terms to find in job-description text, which catches everything a
+# crawler structurally cannot see (Jira, Linear, Notion, PagerDuty...).
+fingerprints:
+  # ---- Malve — Context
+  Slack:
+    line: malve
+    body: ["slack.com/oauth", "join.slack.com", "slack-edge.com"]
+    jd: ["slack"]
+  "Microsoft Teams":
+    line: malve
+    jd: ["microsoft teams", "ms teams"]
+  Notion:
+    line: malve
+    body: ["notion.so", "notion.site"]
+    jd: ["notion"]
+  Confluence:
+    line: malve
+    body: ["atlassian.net/wiki"]
+    jd: ["confluence"]
+  "Google Docs":
+    line: malve
+    jd: ["google workspace", "google docs", "gsuite", "g suite"]
+
+  # ---- Malvedeck — Planning & Health
+  Jira:
+    line: malvedeck
+    body: ["atlassian.net/browse", "jira.com"]
+    jd: ["jira"]
+  Linear:
+    line: malvedeck
+    body: ["linear.app"]
+    jd: ["linear.app", "linear for issue", "linear for project", "we use linear"]
+
+  # ---- Malviont — Execution & Safety
+  PagerDuty:
+    line: malviont
+    body: ["pagerduty.com"]
+    jd: ["pagerduty", "pager duty"]
+  Sentry:
+    line: malviont
+    body: ["sentry-cdn.com", "@sentry/browser", "@sentry/react", "sentry.io/api", "browser.sentry-cdn"]
+    jd: ["sentry"]
+  Datadog:
+    line: malviont
+    body: ["datadoghq-browser-agent", "datadoghq.com", "dd-rum"]
+    jd: ["datadog"]
+  # No `jd` (job-ad text) on any hosting platform below — verified live that
+  # every one of them already gets confirmed by techstack's real header/CNAME
+  # probe, so a job-ad mention adds nothing but false positives. This is what
+  # let a company's "Tools they already use" panel and fit score both credit
+  # them with AWS/Azure/Google Cloud/Vercel simultaneously from nothing more
+  # than "experience with cloud platforms a plus" in a job posting.
+  Vercel:
+    line: malviont
+    headers: ["x-vercel-id", "x-vercel-cache"]
+    cname: ["vercel-dns.com", "vercel-dns-016.com"]
+  Netlify:
+    line: malviont
+    headers: ["x-nf-request-id"]
+    server: ["netlify"]
+    cname: ["netlify.app", "netlifyglobalcdn.com"]
+  Render:
+    line: malviont
+    headers: ["x-render-origin-server"]
+    cname: ["onrender.com"]
+  Railway:
+    line: malviont
+    headers: ["x-railway-request-id", "x-railway-edge"]
+    cname: ["up.railway.app"]
+  GitHub:
+    line: malviont
+    body: ["github.com/"]
+    jd: ["github"]
+  # Real headers/CNAMEs, verified live against aws.amazon.com, azure.microsoft.com,
+  # firebase.google.com and fly.io — not just a job-ad word match.
+  AWS:
+    line: malviont
+    headers: ["x-amz-cf-id", "x-amz-cf-pop"]
+    cname: ["cloudfront.net", "elb.amazonaws.com", "amazonaws.com"]
+  Azure:
+    line: malviont
+    headers: ["x-azure-ref"]
+    cname: ["azurewebsites.net", "azure-api.net", "trafficmanager.net", "azurefd.net"]
+  "Google Cloud":
+    line: malviont
+    server: ["google frontend"]
+    cname: ["appspot.com", "run.app", "googlehosted.com"]
+  Heroku:
+    line: malviont
+    cname: ["herokuapp.com", "herokudns.com"]
+  "Fly.io":
+    line: malviont
+    headers: ["fly-request-id"]
+    server: ["fly/"]
+    cname: ["fly.dev"]
+
+# Not Malveon integrations, but strong evidence of an ICP-shaped engineering org.
+stack_evidence:
+  Kubernetes: ["kubernetes", "k8s", "eks", "gke"]
+  CircleCI: ["circleci", "circle ci"]
+  "GitHub Actions": ["github actions"]
+  Cloudflare: ["cloudflare"]
+  LaunchDarkly: ["launchdarkly", "launch darkly"]
+  Terraform: ["terraform"]
+  Grafana: ["grafana"]
+
+# Domain-form entries (honeycomb.io, backstage.io, blameless.com, harness.io)
+# instead of the bare word — each of those is also common, unrelated English
+# ("honeycomb pattern," "backstage pass," "blameless postmortem" is standard
+# SRE vocabulary having nothing to do with the Blameless product, "we harness
+# AI" is a stock job-ad phrase). Verified live: bare "harness" matched inside
+# "we harness the power of AI" for real companies with no connection to the
+# product at all.
+competitors_complementary: ["pagerduty", "datadog", "sentry", "opsgenie", "new relic", "grafana", "splunk", "honeycomb.io"]
+competitors_displacement: ["incident.io", "rootly", "firehydrant", "backstage.io", "opslevel", "cortex.io", "blameless.com", "jeli.io", "getport.io", "atlassian compass", "swimlanes.io",
+                           "linearb", "getdx", "jellyfish.co", "swarmia", "harness.io"]
+
+# ---------------------------------------------------------------- HIRING TRIGGERS
+roles:
+  sre: ["site reliability", "sre", "devops engineer", "platform engineer", "infrastructure engineer", "production engineer"]
+  em:  ["engineering manager", "director of engineering", "vp of engineering", "vp engineering", "head of engineering", "engineering lead"]
+  eng: ["engineer", "developer", "sre", "devops", "architect", "technical lead"]
+  # A company's first dedicated hire for catching problems before they ship —
+  # the pre-deploy half of Malviont, mirroring first_sre_hire/first_em_hire
+  # for the post-deploy half.
+  release: ["release engineer", "release manager", "qa engineer", "quality engineer",
+            "test engineer", "sdet", "build engineer", "ci/cd engineer", "devex engineer"]
+  # A company's first dedicated hire for catching secrets/config/migration
+  # issues before they reach prod — a hiring signal, not scanning their code.
+  security: ["security engineer", "application security", "appsec", "product security",
+             "security analyst", "devsecops"]
+
+owns_production_terms:
+  ["on-call", "on call rotation", "incident response", "incident management", "postmortem",
+   "post-mortem", "slo", "sla", "error budget", "pagerduty rotation", "runbook", "blameless",
+   "production support", "observability", "root cause analysis", "incident commander"]
+
+eng_req_surge_pct: 40
+
+# ---------------------------------------------------------------- INTENT MINING
+# Generic category terms. Persona pain_terms above are searched IN ADDITION and
+# score much higher, because someone describing a specific pain in their own
+# words is a far stronger signal than someone saying "observability".
+intent_prefilter:
+  ["postmortem", "post-mortem", "incident review", "incident management", "on-call",
+   "oncall", "status page", "runbook", "context switching", "engineering context",
+   "deploy safety", "release safety", "pagerduty", "incident.io", "rootly", "firehydrant",
+   "backstage", "opslevel", "datadog bill", "datadog pricing", "observability cost",
+   "too many tools", "tool sprawl", "slack threads", "decision log", "adr",
+   "who owns this service", "internal developer portal", "developer experience"]
+
+gripe_terms: ["bill", "pricing", "expensive", "cost", "alternative to", "migrating off", "replacing", "fed up", "hate", "sick of"]
+
+hn_queries: ["postmortem", "incident management", "on-call", "engineering context", "tool sprawl",
+             "internal developer portal", "backstage alternative", "pagerduty alternative",
+             "datadog bill", "decision record", "context switching", "deploy safety"]
+subreddits: ["devops", "sre", "ExperiencedDevs", "platform_engineering", "kubernetes", "engineeringmanagers"]
+github_watch_repos: ["incident-io/catalog-importer", "backstage/backstage", "rootlyhq/terraform-provider-rootly", "OpsLevel/cli", "grafana/oncall"]
+
+# ---------------------------------------------------------------- DISCOVERY
+# How the universe GROWS. Without these the account list is only as big as
+# whatever was typed into seeds.txt by hand.
+discovery:
+  # "Ask HN: Who is hiring?" — hundreds of companies per monthly thread, each
+  # posting its own URL and usually its stack. Discovery + technographics +
+  # hiring intent from one free source.
+  # max_per_thread is free to raise — the whole thread is already fetched in
+  # one request either way, this just controls how much of it gets read.
+  hn_hiring: {enabled: true, threads: 4, max_per_thread: 1200}
+  # Y Combinator directory — thousands of companies that ARE this ICP.
+  yc: {enabled: true, pages: 12, min_team_size: 8, max_team_size: 60}
+  # "Show HN" launch posts — noisier than hn_hiring, discovery only.
+  show_hn: {enabled: true, max_posts: 100}
+  # We Work Remotely job RSS — same shape as hn_hiring, different community.
+  wwr: {enabled: true, max_per_category: 60}
+  # Off until PRODUCTHUNT_TOKEN is set — see producthunt.py for how to get one.
+  producthunt: {enabled: true, max_posts: 60}
+
+# ---------------------------------------------------------------- COMMUNITY
+# Where this ICP actually talks, now that X is $200/mo and LinkedIn is off limits.
+community:
+  # The SRE/devops community largely moved here. Public hashtag timelines need
+  # no auth and no key at all.
+  mastodon_instances: ["hachyderm.io", "fosstodon.org"]
+  mastodon_tags: ["devops", "sre", "oncall", "postmortem", "platformengineering",
+                  "observability", "incidentresponse", "kubernetes"]
+
+  devto_tags: ["devops", "sre", "observability", "incidentmanagement", "productivity",
+               "kubernetes", "monitoring"]
+
+  # How far back a competitor star still counts as active evaluation.
+  stargazer_days: 45
+
+  # Customer showcase pages — every company listed is CONFIRMED to run that
+  # integration. Yield varies: several render their logo walls in JavaScript,
+  # so only links present in the initial HTML are visible.
+  vendor_customer_pages:
+    Vercel: "https://vercel.com/customers"
+    Sentry: "https://sentry.io/customers/"
+    PagerDuty: "https://www.pagerduty.com/customers/"
+    Netlify: "https://www.netlify.com/customers/"
+    LaunchDarkly: "https://launchdarkly.com/customers/"
+
+# ---------------------------------------------------------------- SITE TRACKING
+# Reverse-IP identification of malveon.com visitors. The single highest-value
+# signal in the system: someone reading your pricing page beats anything
+# inferred from the outside.
+tracking:
+  enabled: true
+  # ipinfo.io free tier is 50k lookups/month — far more than needed.
+  provider: ipinfo
+  # Pages that indicate a buying motion rather than casual reading.
+  pricing_paths: ["/pricing", "/plans", "/signup", "/demo", "/book", "/trial", "/contact"]
+  # The .docx is explicit: automated traffic now outweighs human traffic, and a
+  # naive reverse-IP pipeline fills with bots scraping pricing pages from
+  # datacenters. Everything below is bot rejection.
+  bot_ua: ["bot", "crawl", "spider", "slurp", "curl", "wget", "python-requests",
+           "headless", "phantom", "puppeteer", "playwright", "scrapy", "axios",
+           "go-http-client", "java/", "libwww", "lighthouse", "gptbot", "claudebot",
+           "ccbot", "bytespider", "ahrefs", "semrush", "petalbot", "facebookexternalhit"]
+  # ISPs / hosting are not companies. A match here is discarded, not scored.
+  ignore_org: ["amazon", "google llc", "microsoft corporation", "digitalocean", "linode",
+               "hetzner", "ovh", "cloudflare", "akamai", "fastly", "oracle cloud",
+               "comcast", "verizon", "at&t", "jio", "airtel", "bsnl", "vodafone",
+               "t-mobile", "charter", "spectrum", "telecom", "broadband", "cable",
+               "hosting", "datacenter", "data center", "vpn", "colocation"]
+  min_seconds_on_page: 3    # sub-3s hits are almost always automated
+  session_minutes: 30
+
+# ---------------------------------------------------------------- CONTACTS
+target_titles:
+  ["cto", "vp of engineering", "vp engineering", "head of engineering", "director of engineering",
+   "engineering manager", "head of platform", "head of infrastructure", "director of platform",
+   "sre lead", "devops lead", "co-founder", "founder"]
+contacts_per_account: 2
+
+email_patterns: ["{f}.{l}", "{f}", "{fi}{l}", "{f}{l}", "{f}{li}", "{f}_{l}",
+                 "{fi}.{l}", "{l}{fi}", "{l}.{f}", "{f}-{l}", "{l}"]
+
+# ---------------------------------------------------------------- OPERATIONS
+http:
+  connect_timeout: 5
+  read_timeout: 15
+  user_agent: "MalveonLeadBot/0.2 (+https://malveon.com; contact ladsonselvam1998@gmail.com)"
+  global_concurrency: 12
+
+breaker:
+  failure_threshold: 5
+  open_minutes: 30
+
+collectors:
+  # These all run on free, unauthenticated (or generously-limited) APIs, so
+  # "real time" here means "check often" rather than actual push/webhooks —
+  # none of these sources offer a webhook for a third party watching them, so
+  # polling is the only option. Checking every few minutes instead of every
+  # few hours costs nothing extra (same Railway plan, same requests, just more
+  # of them) and is what makes the manual buttons feel live. GitHub-backed
+  # sources (github, stargazers, contacts) stay more conservative to share a
+  # 5,000/hour token budget across all three.
+  #
+  # discover_per_run bounds the expensive part: probing 5 ATS platforms for a
+  # domain whose board is unknown. Known boards always refresh.
+  ats:        {enabled: true,  every_minutes: 180,  concurrency: 6, discover_per_run: 60}
+  techstack:  {enabled: true,  every_minutes: 1440, concurrency: 8}
+  # Timing signal — poll more often than anything else, incidents go stale fast.
+  statuspage: {enabled: true,  every_minutes: 30,   concurrency: 8}
+  mastodon:   {enabled: true,  every_minutes: 15,   concurrency: 2}
+  devto:      {enabled: true,  every_minutes: 30,   concurrency: 2}
+  stargazers: {enabled: true,  every_minutes: 60,   concurrency: 2}
+  # Work emails for the accounts worth contacting. Bounded per run because each
+  # account costs ~12 GitHub requests against a 5,000/hour budget.
+  contacts:   {enabled: true,  every_minutes: 240,  concurrency: 2, accounts_per_run: 25}
+  vendors:    {enabled: true,  every_minutes: 720,  concurrency: 3}
+  jobfeeds:   {enabled: true,  every_minutes: 360,  concurrency: 2}
+  hn_hiring:  {enabled: true,  every_minutes: 1440, concurrency: 4}
+  # Now that YC pagination advances instead of restarting at page 1 every
+  # time, checking often is what actually finds new companies — at 30 min and
+  # 12 pages/run the ~250-page directory gets fully crawled in about a day.
+  yc:         {enabled: true,  every_minutes: 30,   concurrency: 4}
+  edgar:      {enabled: true,  every_minutes: 720,  concurrency: 2}
+  hn:         {enabled: true,  every_minutes: 15,   concurrency: 2}
+  github:     {enabled: true,  every_minutes: 60,   concurrency: 2}
+  lobsters:   {enabled: true,  every_minutes: 30,   concurrency: 1}
+  show_hn:    {enabled: true,  every_minutes: 20,   concurrency: 1}
+  wwr:        {enabled: true,  every_minutes: 60,   concurrency: 2}
+  # Silently does nothing every run until PRODUCTHUNT_TOKEN is set.
+  producthunt: {enabled: true, every_minutes: 60,   concurrency: 1}
+  # Reddit's free tier is NON-COMMERCIAL. Off by default — your call.
+  reddit:     {enabled: false, every_minutes: 240,  concurrency: 1}

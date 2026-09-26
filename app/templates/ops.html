@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}System status{% endblock %}
+{% block body %}
+<div class="panel">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    {% if health.ok %}
+      <span class="pill ok" style="font-size:13px;padding:3px 10px">✓ Everything's running</span>
+      <span class="muted">{{ health.detail }}</span>
+    {% else %}
+      <span class="pill bad" style="font-size:13px;padding:3px 10px">⚠ Needs attention</span>
+      <span class="muted">{{ health.detail }}</span>
+    {% endif %}
+  </div>
+  <div style="margin-top:12px">
+    <span class="stat"><b>{{ stats.accounts }}</b>companies tracked</span>
+    <span class="stat"><b>{{ stats.contacts }}</b>emails found</span>
+    {% if pending %}<span class="stat"><b>{{ pending }}</b>posts waiting to be sorted</span>{% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <h3 style="margin-top:0">Check for new information</h3>
+  <p class="muted" style="margin-top:0">This happens automatically on a schedule.
+    Use these only if you want to check a particular source right now.</p>
+  {% if just_ran %}
+  <p class="{{ 'ok' if just_ran.ok else 'bad' }}" style="margin:8px 0;font-weight:600">
+    {{ just_ran.msg }}</p>
+  {% endif %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    {% for c in sources %}
+    <form action="/ops/run" method="post" class="inline">
+      <input type="hidden" name="collector" value="{{ c.key }}">
+      <button title="{{ c.help }}">{{ c.label }}</button></form>
+    {% endfor %}
+  </div>
+  {% if pending %}
+  <form action="/ops/classify" method="post" style="margin-top:10px">
+    <button class="btn">Sort the {{ pending }} waiting posts</button>
+    <span class="muted"> · takes a minute or two</span>
+  </form>
+  {% endif %}
+</div>
+
+<details class="help">
+  <summary>Technical details</summary>
+  <div class="body" style="border:0;padding:0">
+    <div class="panel">
+      <h3 style="margin-top:0">Connected services</h3>
+      <p class="muted" style="margin-top:0">Optional accounts that unlock extra
+        information. Missing ones just mean that source stays switched off.</p>
+      {% for name, present in keys.items() %}
+        <span class="pill {{ 'ok' if present else '' }}" style="margin-right:6px">
+          {{ '✓' if present else '—' }} {{ name }}</span>
+      {% endfor %}
+      <p class="muted" style="margin-top:10px">Data stored at <code>{{ data_dir }}</code>
+        · {{ db_rows }} pieces of information collected.</p>
+      <form action="/ops/reload" method="post" style="margin-top:8px">
+        <button>Reload settings file</button></form>
+      <a href="/ops/backup" style="margin-left:8px"><button type="button">Download a backup</button></a>
+      <p class="muted" style="margin-top:6px">Everything lives in one database with
+        no automatic backup. Download this occasionally and keep it somewhere safe.</p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">Sources with problems</h3>
+      <p class="muted" style="margin-top:0">A source that fails repeatedly gets paused
+        automatically so it stops wasting time, then retries later on its own.</p>
+      <table><tr><th>Source</th><th>Failures in a row</th><th>Paused until</th></tr>
+      {% for b in breakers %}
+        <tr><td>{{ source_name(b.collector) }}</td>
+            <td class="{{ 'bad' if b.failures else 'muted' }}">{{ b.failures or 'none' }}</td>
+            <td class="{{ 'bad' if b.opened_until else 'muted' }}">{{ b.opened_until or 'not paused' }}</td></tr>
+      {% else %}<tr><td colspan="3" class="muted">None.</td></tr>{% endfor %}
+      </table>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">Recent checks</h3>
+      <table><tr><th>Source</th><th>When</th><th>Result</th><th>Found</th><th>New</th><th>Problem</th></tr>
+      {% for r in runs %}
+        <tr><td>{{ source_name(r.collector) }}</td>
+            <td class="muted">{{ r.started_at[:16].replace('T',' ') }}</td>
+            <td class="{{ 'ok' if r.status=='ok' else 'bad' }}">
+              {{ 'Worked' if r.status=='ok' else ('Running' if r.status=='running' else 'Failed') }}</td>
+            <td>{{ r.records or 0 }}</td><td>{{ r.signals or 0 }}</td>
+            <td class="muted">{{ (r.error or '')[:70] }}</td></tr>
+      {% else %}<tr><td colspan="6" class="muted">Nothing yet.</td></tr>{% endfor %}
+      </table>
+    </div>
+  </div>
+</details>
+{% endblock %}

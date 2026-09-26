@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}What people are saying{% endblock %}
+{% block body %}
+<details class="help">
+  <summary>What this page is</summary>
+  <div class="body">
+    Public posts from Hacker News, GitHub, Mastodon and Dev.to where someone
+    talks about the problem Malveon solves. Most posts don't say who the person
+    works for, so we can't link them to a company automatically — guessing would
+    just put the wrong name on your list. When you recognise the company, type it
+    in and it gets added to that company's record straight away.
+  </div>
+</details>
+
+<div class="chips">
+  <a class="chip {{ 'on' if not label }}" href="/feed">All</a>
+  <a class="chip {{ 'on' if label=='stated_intent' }}" href="/feed?label=stated_intent">Ready to buy</a>
+  <a class="chip {{ 'on' if label=='competitor_gripe' }}" href="/feed?label=competitor_gripe">Unhappy with a rival</a>
+  <a class="chip {{ 'on' if label=='active_research' }}" href="/feed?label=active_research">Looking around</a>
+</div>
+
+<table>
+<tr><th style="width:150px">What it sounds like</th><th>The post</th><th style="width:220px">Company</th></tr>
+{% for p in posts %}
+{% set plabel, pclass = post_label(p.label) %}
+<tr>
+  <td>
+    {% if p.label %}
+      <span class="tag {{ pclass }}">{{ plabel }}</span>
+      {% if p.confidence %}<div class="muted">{{ '%.0f'|format(p.confidence*100) }}% sure</div>{% endif %}
+    {% else %}<span class="muted">Not sorted yet</span>{% endif %}
+  </td>
+  <td>
+    <a href="{{ p.url }}" target="_blank" rel="noopener"><b>{{ p.title or (p.body or '')[:90] }}</b></a>
+    <div class="muted">{{ source_name(p.source) }} · {{ p.author }} · {{ (p.created_at or '')[:10] }}</div>
+    {% if p.rationale %}<div class="muted">↳ {{ p.rationale }}</div>{% endif %}
+    <div class="why">{{ (p.body or '')[:260] }}</div>
+  </td>
+  <td>
+    {% if p.domain %}<a href="/a/{{ p.domain }}">{{ p.domain }}</a>
+    {% else %}
+      <form action="/feed/{{ p.id }}/attach" method="post">
+        <input name="domain" placeholder="company website…" style="width:140px"
+               title="If you know where this person works, enter their company's website">
+        <button title="Add this post to that company's record">Add</button>
+      </form>
+    {% endif %}
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="3" class="muted" style="padding:40px;text-align:center">
+  Nothing here yet.
+  {% if label %}<br><a href="/feed">Show all posts</a>{% endif %}
+</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

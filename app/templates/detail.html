@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}{{ a.name or a.domain }}{% endblock %}
+{% block body %}
+<div class="panel">
+  <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap">
+    <div>
+      <h2 style="margin:0">{{ a.name or a.domain }}</h2>
+      <div class="muted"><a href="https://{{ a.domain }}" target="_blank" rel="noopener">{{ a.domain }}</a>
+        {% if a.headcount %} · {{ a.headcount }} people{% endif %}</div>
+      <div style="margin-top:8px">
+        {% for t in a.types %}{% set tl, tc, th = lead_type(t) %}
+          <span class="tag {{ tc }}" title="{{ th }}">{{ tl }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    <div style="margin-left:auto;text-align:right">
+      <div class="score {{ a.tier }}" style="font-size:34px">{{ a.score }}</div>
+      <div class="muted"><abbr title="{{ SCORE_HELP }}">score</abbr></div>
+      <div class="muted" style="margin-top:2px">
+        <abbr title="{{ FIT_HELP }}">match</abbr> {{ a.fit }} ·
+        <abbr title="{{ INTENT_HELP }}">activity</abbr> {{ a.intent }}
+      </div>
+    </div>
+  </div>
+  {% if a.disqualified %}<p class="bad">Ruled out: {{ a.disqualified }}</p>{% endif %}
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <form action="/a/{{ a.domain }}/watch" method="post" class="inline">
+      <button>{{ '★ Starred' if a.watchlisted else '☆ Star this company' }}</button></form>
+    <form action="/a/{{ a.domain }}/enrich" method="post" class="inline">
+      <button title="Looks for work email addresses this company has published publicly">Find emails</button></form>
+    <form action="/a/{{ a.domain }}/disqualify" method="post" class="inline">
+      <input type="hidden" name="reason" value="manual">
+      <button>{{ 'Put back on the list' if a.disqualified else 'Not a fit' }}</button></form>
+  </div>
+</div>
+
+<div class="grid">
+  <div>
+    <div class="panel">
+      <h3 style="margin-top:0">Why they're worth contacting</h3>
+      {% for r in a.reasons %}
+        <div class="sig">
+          <span class="pts">+{{ r.points }}</span>
+          {{ r.detail }}
+          {% if r.url %}<a href="{{ r.url }}" target="_blank" rel="noopener">↗</a>{% endif %}
+          {% if r.when %}<span class="muted"> · {{ r.when }}</span>{% endif %}
+        </div>
+      {% else %}<p class="muted">Nothing found for this company yet.</p>{% endfor %}
+      {% if a.reasons %}
+      <p class="muted" style="margin-top:10px">Points add up to the priority score.
+        Anything about a recent event counts for more than a general match.</p>
+      {% endif %}
+    </div>
+
+    {% set pain_kinds = ["persona_pain_post", "persona_pain_match", "active_research",
+                         "competitor_gripe", "stated_intent", "competitor_evaluation"] %}
+    {% set pain_signals = a.signals | selectattr("kind", "in", pain_kinds) | list %}
+    {% if pain_signals %}
+    <div class="panel">
+      <h3 style="margin-top:0">What people are saying</h3>
+      <p class="muted" style="margin-top:0">Real posts and job ads describing this exact
+        problem — not just tools they happen to use.</p>
+      {% for s in pain_signals %}
+        <div class="sig">
+          <span class="tag">{{ signal_kind(s.kind) }}</span>{{ s.detail }}
+          {% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">↗</a>{% endif %}
+          <div class="muted">{{ source_name(s.source) }} · {{ s.observed_at[:10] }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if a.signals %}
+    <details class="help">
+      <summary>See everything we found ({{ a.signals|length }} items)</summary>
+      <div class="body" style="border:0;padding:0">
+        {% for s in a.signals %}
+          <div class="sig">
+            <span class="tag">{{ signal_kind(s.kind) }}</span>{{ s.detail }}
+            {% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">↗</a>{% endif %}
+            <div class="muted">{{ source_name(s.source) }} · {{ s.observed_at[:10] }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+
+  <div>
+    <div class="panel">
+      <h3 style="margin-top:0">Tools they already use</h3>
+      {% if a.tools %}
+        <p class="muted" style="margin-top:0">They run <b>{{ a.tools|length }}</b> tools that Malveon
+           plugs into. That's usually a sign the problem you solve is real for them.</p>
+        {% for line, tools in a.lines.items() %}
+          <div class="sig">
+            <b>{{ product_lines[line].label }}</b>
+            <div>{% for t in tools %}<span class="tag">{{ t }}</span>{% endfor %}</div>
+          </div>
+        {% endfor %}
+        {% if a.best_line %}
+        <p class="muted" style="margin-top:12px"><b>Lead with {{ a.best_line_label }}</b> —
+           they run {{ a.lines[a.best_line]|join(', ') }}, so
+           {{ a.best_line_hook }} is a live problem for them.</p>
+        {% endif %}
+      {% else %}<p class="muted">Nothing detected on their site yet.</p>{% endif %}
+    </div>
+
+    {% if a.personas %}
+    <div class="panel">
+      <h3 style="margin-top:0">Who to write to</h3>
+      {% for pid in a.personas %}
+        <div class="sig">
+          <b>{{ personas[pid].title }}</b>
+          <div class="muted">Their daily frustration: {{ personas[pid].villain }}</div>
+          <div style="margin-top:4px">“{{ personas[pid].one_liner }}”</div>
+        </div>
+      {% endfor %}
+      <p class="muted">This company's own job ads or public posts used the same
+        language this role uses when describing the problem.</p>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+      <h3 style="margin-top:0">Email addresses</h3>
+      {% for c in a.contacts %}
+        {% set label, cls, why = email_status(c.status) %}
+        <div class="sig">
+          <b>{{ c.name or c.email }}</b>
+          <span class="pill {{ cls }}">{{ label }}</span>
+          {% if c.title %}<div class="muted">{{ c.title }}</div>{% endif %}
+          <div><a href="mailto:{{ c.email }}">{{ c.email }}</a></div>
+          {% if why %}<div class="muted">{{ why }}</div>{% endif %}
+        </div>
+      {% else %}<p class="muted">None yet. “Find emails” looks for addresses this
+        company's engineers have published publicly. It's free.</p>{% endfor %}
+      <form action="/a/{{ a.domain }}/verify" method="post" style="margin-top:10px">
+        <input name="email" placeholder="check an address…" style="width:66%">
+        <button class="btn">Check</button>
+      </form>
+      <p class="muted" style="margin-top:6px">Checking confirms the mailbox really
+        exists before you send.</p>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">Link to use in your email</h3>
+      <p class="muted" style="margin-top:0">Put this link in the email you send them
+        instead of plain malveon.com. If they click it, you'll see it here — by name,
+        not a guess.</p>
+      <input readonly onclick="this.select()" value="{{ track_link }}"
+             style="width:100%;margin-top:6px;font-family:ui-monospace,monospace;font-size:12px">
+      <p class="muted" style="margin-top:6px">Click the box to select, then copy.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

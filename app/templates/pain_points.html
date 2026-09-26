@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Pain points{% endblock %}
+{% block body %}
+<div class="panel">
+  <span class="stat"><b>{{ rows|length }}</b>companies with real evidence</span>
+</div>
+
+<details class="help">
+  <summary>What this page is</summary>
+  <div class="body">
+    Companies where a real person said something — a post, a job ad, a
+    complaint about a rival — not just an outage or a tool detected on their
+    site. Outages alone outnumber everything on this page combined, which is
+    exactly why this stays separate instead of getting buried underneath them.
+  </div>
+</details>
+
+{% for r in rows %}
+<div class="panel">
+  <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+    <div>
+      <h3 style="margin:0"><a href="/a/{{ r.domain }}">{{ r.name or r.domain }}</a></h3>
+      <div class="muted">{{ r.domain }}{% if r.headcount %} · {{ r.headcount }} people{% endif %}
+        {% if r.hosting %} · hosted on {{ r.hosting|join(', ') }}{% endif %}</div>
+    </div>
+    <div style="margin-left:auto;text-align:right">
+      <div class="score {{ r.tier }}" style="font-size:22px">{{ r.score }}</div>
+      <div class="muted">score</div>
+    </div>
+  </div>
+  <div style="margin-top:10px">
+    {% for q in r.quotes %}
+      <div class="sig">
+        <span class="tag">{{ signal_kind(q.kind) }}</span>{{ q.detail }}
+        {% if q.url %}<a href="{{ q.url }}" target="_blank" rel="noopener">↗</a>{% endif %}
+        <div class="muted">{{ source_name(q.source) }} · {{ q.observed_at[:10] }}</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="panel muted" style="text-align:center;padding:40px">
+  Nothing here yet. As real posts and job ads get matched to companies, they'll show up here.
+</div>
+{% endfor %}
+{% endblock %}
