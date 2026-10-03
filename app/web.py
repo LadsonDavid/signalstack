@@ -7,6 +7,7 @@ three lead types are filter chips over one table, not three pages.
 from __future__ import annotations
 
 import contextlib
+import hmac
 import logging
 import os
 import pathlib
@@ -54,8 +55,10 @@ async def gate(request: Request, call_next):
     """Optional shared-secret gate for the hosted deployment."""
     # The pixel endpoints must stay public — they are called by malveon.com.
     if Env.UI_KEY and request.url.path not in ("/healthz", "/px", "/px.js"):
-        if request.query_params.get("key") != Env.UI_KEY and \
-                request.cookies.get("k") != Env.UI_KEY:
+        # The x-key header is for programs (malves): it keeps the key out of URLs.
+        given = (request.query_params.get("key"), request.cookies.get("k"),
+                 request.headers.get("x-key"))
+        if not any(g and hmac.compare_digest(g, Env.UI_KEY) for g in given):
             return HTMLResponse("<h1>401</h1><p>append ?key=…</p>", status_code=401)
     resp = await call_next(request)
     if Env.UI_KEY and request.query_params.get("key") == Env.UI_KEY:
@@ -97,6 +100,41 @@ def board(request: Request, type: str | None = Query(None), watch: int = 0,
         "rows": rows, "type": type, "watch": watch, "q": q or "",
         "stats": leads.stats(), "thresholds": cfg()["thresholds"],
     })
+
+
+@app.get("/api/leads")
+def api_leads(type: str | None = Query(None), limit: int = Query(25, ge=1, le=100)):
+    """The board as JSON, for malves' phone app: who to contact this week, and why.
+
+    Fields are picked one by one rather than dumping the board row: the row
+    carries sets and internal scoring detail that aren't JSON and aren't for a
+    phone screen.
+    """
+    return {
+        "generated_at": db.now(),
+        "leads": [_lead_json(r) for r in leads.board(lead_type=type, limit=limit)],
+    }
+
+
+def _lead_json(r: dict) -> dict:
+    # board() already sorted contacts best-first and dropped known-bad addresses.
+    best = (r.get("contacts") or [None])[0]
+    return {
+        "domain": r["domain"],
+        "name": r.get("name") or r["domain"],
+        "tier": r["tier"],
+        "score": r["score"],
+        "fit": r["fit"],
+        "intent": r["intent"],
+        "types": r["types"],
+        "why": r["why"],
+        "trigger": r.get("trigger") or "",
+        "opener": r.get("best_line_hook") or "",
+        "contact": {k: best.get(k) or "" for k in ("name", "title", "email", "status")}
+        if best else None,
+        "signals": r["n_signals"],
+        "last_signal": r.get("last_signal") or "",
+    }
 
 
 @app.get("/pain-points", response_class=HTMLResponse)
