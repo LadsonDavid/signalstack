@@ -5,7 +5,7 @@ import tempfile
 # Must be set before app.config is imported anywhere.
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="leadtest-")
 os.environ.setdefault("CONFIG_PATH",
-                      str(pathlib.Path(__file__).resolve().parent.parent / "malveon.yaml"))
+                      str(pathlib.Path(__file__).resolve().parent.parent / "config.example.yaml"))
 
 import pytest  # noqa: E402
 
